@@ -1,0 +1,6 @@
+Revision history for Perl extension Module::StaticBinaryBuilder.
+
+0.01  Wed Feb  8 12:36:39 2012
+	- original version; created by h2xs 1.23 with options
+		-AXn Module::StaticBinaryBuilder
+

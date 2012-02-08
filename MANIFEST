@@ -1,6 +1,6 @@
+Build.PL
 Changes
-Makefile.PL
+lib/Module/StaticBinaryBuilder.pm
 MANIFEST
 README
 t/Module-StaticBinaryBuilder.t
-lib/Module/StaticBinaryBuilder.pm

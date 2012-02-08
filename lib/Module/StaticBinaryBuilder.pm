@@ -1,38 +1,88 @@
 package Module::StaticBinaryBuilder;
 
-use 5.014002;
-use strict;
-use warnings;
-
-require Exporter;
-
-our @ISA = qw(Exporter);
-
-# Items to export into callers namespace by default. Note: do not export
-# names by default without a very good reason. Use EXPORT_OK instead.
-# Do not simply export all your public functions/methods/constants.
-
-# This allows declaration	use Module::StaticBinaryBuilder ':all';
-# If you do not need this, moving things directly into @EXPORT or @EXPORT_OK
-# will save memory.
-our %EXPORT_TAGS = ( 'all' => [ qw(
-	
-) ] );
-
-our @EXPORT_OK = ( @{ $EXPORT_TAGS{'all'} } );
-
-our @EXPORT = qw(
-	
-);
-
 our $VERSION = '0.01';
 
+use strict;
+use warnings;
+use 5.012;
 
-# Preloaded methods go here.
+use File::Spec;
+
+use Module::StaticBinaryBuilder::Driver;
+
+our $verbose_level //= 3;
+
+sub _notify {
+    my $self = shift;
+    my $level = shift;
+    if ($level <= $self->{verbose_level}) {
+        my $msg = join(": ", @_);
+        chomp $msg;
+        print STDERR "$msg\n";
+    }
+}
+
+sub _debug { shift->_notify(2, @_) }
+sub _info  { shift->_notify(1, @_) }
+sub _error { shift->_notify(0, @_) }
+sub _die   { shift->_error(@_); exit(1) };
+
+sub new {
+    my ($class, %opts) = @_;
+    my $components = delete $opts{components};
+    my $sbb = { opts => \%opts,
+                working_directory => File::Spec->rel2abs('build'),
+                components => [],
+                verbose_level => $verbose_level };
+    bless $sbb, $class;
+    $sbb->_add_component($_) for @$components;
+    $sbb;
+}
+
+sub _working_directory {
+    my $sbb = shift;
+    my $wd = $sbb->{working_directory};
+    File::Spec->join($wd, @_);
+}
+
+sub _target_directory { shift->_working_directory("target", @_) }
+
+sub _add_component {
+    my ($sbb, $c) = @_;
+    my $cs = $sbb->{components};
+    push @$cs, Module::StaticBinaryBuilder::Driver->_new($sbb, %$c,
+                                                         _index => scalar(@$cs));
+}
+
+sub run {
+    my $sbb = shift;
+    my ($cmd, @args) = (@_ ? @_ : @ARGV);
+    my $method = $sbb->can("_cmd_$cmd")
+        or $sbb->_die("command $cmd not supported");
+    $sbb->$method(@args);
+}
+
+sub _cmd_build {
+    my $sbb = shift;
+    $sbb->_create_working_environment;
+    $_->_build($sbb) for @{$sbb->{components}};
+    $sbb->_build_dist;
+}
+
+sub _create_working_environment {
+    my $sbb = shift;
+    for my $method (qw(_working_directory _target_directory)) {
+        my $path = $sbb->$method;
+        $sbb->_debug("creating directory $path");
+        mkdir $path;
+        -d $path or $sbb->_die("unable to create working directory $path");
+    }
+}
+
+sub _build_dist {}
 
 1;
 __END__
-# Below is stub documentation for your module. You'd better edit it!
 
 =head1 NAME
 

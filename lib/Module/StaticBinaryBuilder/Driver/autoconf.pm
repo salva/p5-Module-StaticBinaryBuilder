@@ -24,6 +24,7 @@ sub _check_src_directory {
 
 sub _configure {
     my ($driver, $sbb) = @_;
+    return if $driver->_is_done($sbb);
     $sbb->_info("running $driver->{configure_script} inside $driver->{src_directory}");
     my $configure = File::Spec->join('.', $driver->{configure_script});
     my $extra = $driver->{configure_extra};
@@ -35,22 +36,27 @@ sub _configure {
     local $CWD = $driver->{src_directory};
     system $configure, "--prefix=$target", @$extra
         and $sbb->_die("configure failed, rc", ($? >> 8));
+    $driver->_set_done($sbb);
 }
 
 sub _compile {
     my ($driver, $sbb) = @_;
+    return if $driver->_is_done($sbb);
     $sbb->_info("compiling with command $driver->{compile_command}");
     local $CWD = $driver->{src_directory};
     system $driver->{compile_command}
         and $sbb->_die("compilation failed, rc", ($? >> 8));
+    $driver->_set_done($sbb);
 }
 
 sub _install {
     my ($driver, $sbb) = @_;
+    return if $driver->_is_done($sbb);
     $sbb->_info("installing with command $driver->{install_command}");
     local $CWD = $driver->{src_directory};
     system $driver->{install_command}
         and $sbb->_die("installation failed, rc", ($? >> 8));
+    $driver->_set_done($sbb);
 }
 
 1;

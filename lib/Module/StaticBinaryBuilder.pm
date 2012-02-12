@@ -46,6 +46,7 @@ sub _working_directory {
 }
 
 sub _target_directory { shift->_working_directory("target", @_) }
+sub _is_done_directory { shift->_working_directory("is_done", @_) }
 
 sub _add_component {
     my ($sbb, $c) = @_;
@@ -62,6 +63,33 @@ sub run {
     $sbb->$method(@args);
 }
 
+
+sub _static_binaries {
+    my $sbb = shift;
+    my %sbd;
+    my %sb;
+    for my $driver (@{$sbb->{components}}) {
+        $sbd{$sbb->_target_directory($_)} = 1 for $driver->_static_binaries_dirs;
+        $sb{$sbb->_target_directory($_)} = 1 for $driver->_static_binaries;
+    }
+
+
+    my $flm = File::LibMagic->new;
+    for my $sbd (sort keys %sbd) {
+        if (opendir my $dh, $sbd) {
+            while (defined (my $file = readdir $dh)) {
+                $file = File::Spec->join($sbd, $file);
+                next unless -f $file;
+                my $type = $flm->describe_filename($file);
+                $sbd{$file} = 1 if $type =~ /\bexecutable\b
+                $sbb->_debug("file $file is of type $type");
+            }
+        }
+    }
+    return sort keys %sb;
+
+}
+
 sub _cmd_build {
     my $sbb = shift;
     $sbb->_create_working_environment;
@@ -71,7 +99,7 @@ sub _cmd_build {
 
 sub _create_working_environment {
     my $sbb = shift;
-    for my $method (qw(_working_directory _target_directory)) {
+    for my $method (qw(_working_directory _target_directory _is_done_directory)) {
         my $path = $sbb->$method;
         $sbb->_debug("creating directory $path");
         mkdir $path;
@@ -79,7 +107,10 @@ sub _create_working_environment {
     }
 }
 
-sub _build_dist {}
+sub _build_dist {
+    my $sbb = shift;
+    my @sbfs = $sbb->_static_binaries;
+}
 
 1;
 __END__
@@ -120,7 +151,7 @@ If you have a web site set up for your module, mention it here.
 
 =head1 AUTHOR
 
-Salvador Fandiño, E<lt>salva@E<gt>
+Salvador Fandiño, E<lt>sfandino@yahoo.comE<gt>
 
 =head1 COPYRIGHT AND LICENSE
 
@@ -129,6 +160,5 @@ Copyright (C) 2012 by Salvador Fandiño
 This library is free software; you can redistribute it and/or modify
 it under the same terms as Perl itself, either Perl version 5.14.2 or,
 at your option, any later version of Perl 5 you may have available.
-
 
 =cut

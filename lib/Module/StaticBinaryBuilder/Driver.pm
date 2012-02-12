@@ -55,32 +55,35 @@ sub _build {
 
 sub _create_working_environment {
     my ($driver, $sbb) = @_;
+    return if $driver->_is_done($sbb);
     for my $slot (qw(working_directory unpack_directory)) {
         my $path = $driver->{$slot};
         $sbb->_debug("creating directory $path");
         mkdir $path;
         -d $path or $sbb->_die("unable to create directory $path");
     }
+    $driver->_set_done($sbb);
 }
 
 sub _download {
     my ($driver, $sbb) = @_;
+    my $archive = $driver->{archive} = $driver->_working_directory('archive-0');
+    return if $driver->_is_done($sbb);
     my $source = $driver->{source} // $sbb->_die("unable to download archive for component $driver->{name}",
                                                "source not defined");
     $sbb->_info("downloading $source");
-    my $archive = $driver->{archive} = $driver->_working_directory('archive-0');
     my $ok = mirror($driver->{source}, $archive);
     grep { $ok = $_ } RC_OK, RC_NOT_MODIFIED or
         $sbb->_die("unable to retrieve $driver->{source}", $ok);
+    $driver->_set_done($sbb);
 }
 
 sub _unpack {
     my ($driver, $sbb) = @_;
     my $archive = $driver->{archive} // $sbb->_die("internal error",
                                                    "archive slot is undefined");
-
+    return if $driver->_is_done($sbb);
     $sbb->_info("unpacking archive $archive");
-
     -f $archive or $sbb->_die("internal error",
                               "$archive does not exists or is not a file");
     my $flm = File::LibMagic->new;
@@ -94,13 +97,13 @@ sub _unpack {
     else {
         $sbb->_die("unsupported file format", $tm);
     }
+    $driver->_set_done($sbb);
 }
 
 sub _check_src_directory { 1 }
 
 sub _find_src_directory {
     my ($driver, $sbb) = @_;
-
     opendir my $dh, $driver->{unpack_directory}
         or $sbb->_die("unable to list contents of directory $driver->{unpack_directory}");
     my @dirs = grep !/^\./, readdir $dh;
@@ -112,7 +115,6 @@ sub _find_src_directory {
             return;
         }
     }
-
     $sbb->_die("unable to find source directory inside $driver->{unpack_directory}");
 }
 
@@ -124,6 +126,27 @@ sub _configure {
 sub _compile {
     my ($driver, $sbb) = @_;
     $sbb->_die("internal error", "_compile method is not implemented");
+}
+
+sub _static_binaries_dirs { 'bin' }
+
+sub _static_binaries {}
+
+sub _is_done_file {
+    my ($driver, $sbb) = @_;
+    my $sub = (caller 2)[3];
+    $sub =~ s/(.*::_?)//;
+    my $name = $driver->{name};
+    $sbb->_is_done_directory("$driver->{name}-$sub");
+}
+
+sub _is_done { -f shift->_is_done_file(@_) }
+
+sub _set_done {
+    my ($driver, $sbb) = @_;
+    my $file = $driver->_is_done_file($sbb);
+    $sbb->_debug("creating is_done file $file");
+    open my $fh, '>', $file;
 }
 
 1;
